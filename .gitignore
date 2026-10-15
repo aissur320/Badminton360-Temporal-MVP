@@ -1,0 +1,17 @@
+data/**
+!data/.gitkeep
+weights/**
+!weights/.gitkeep
+outputs/
+.venv/
+.cache/
+*.egg-info/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.pt
+*.cache
+configs/local*.json
+reports/*local*.json
+# Local audit records refer to the unpublished historical research archive.
+reports/

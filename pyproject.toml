@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "badminton-temporal-mvp"
+version = "0.1.0"
+description = "YOLOv8s temporal post-processing research MVP"
+requires-python = ">=3.10,<3.14"
+# Dependencies are pinned in requirements.txt; avoid silently selecting a GPU build.
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]

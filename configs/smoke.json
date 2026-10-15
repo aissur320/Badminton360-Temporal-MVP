@@ -1,0 +1,25 @@
+{
+  "experiment_kind": "new_experiment_not_paper_reproduction",
+  "source_class_map": {"0": 0, "3": 0},
+  "paths": {
+    "data_root": "data/smoke_mapped",
+    "pretrained_weights": "weights/yolov8s.pt",
+    "output_root": "outputs"
+  },
+  "run_name": "smoke_1epoch_verified",
+  "sequence_pattern": "(?P<sequence_id>video[0-9]+)_(?P<frame_index>[0-9]+)\\.(?:png|jpg|jpeg)",
+  "train": {"epochs": 1, "imgsz": 320, "batch": 2, "device": "cpu", "workers": 0, "seed": 0, "rect": true},
+  "predict": {"imgsz": 320, "conf": 0.3, "iou": 0.45, "device": "cpu"},
+  "clean": {
+    "width_policy": "actual_image_width",
+    "iou_threshold": 0.1,
+    "distance_ratio": [0.1, 5.0],
+    "cosine_threshold": 0.8,
+    "protect_max_gap": 5,
+    "protect_r0": 10,
+    "protect_k": 5,
+    "trajectory_distance": 50
+  },
+  "interpolate": {"max_linear_gap": 5, "max_spline_gap": 10, "spline_confidence_scale": 0.8},
+  "evaluation": {"protocol": "confidence_greedy_best_unmatched_ap101_v1"}
+}
