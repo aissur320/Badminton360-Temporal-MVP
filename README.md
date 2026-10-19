@@ -1,27 +1,29 @@
-# 运行手册：Windows / Linux
+# Running the MVP on Windows and Linux
 
-## 1. 独立运行条件
+## 1. Standalone Requirements
 
-`research_mvp` 可以独立于历史研究目录运行：只需要本目录的源代码、数据集、Python依赖和初始化权重，不依赖父目录的历史Python脚本、日志、论文或旧实验权重。
+`research_mvp` can run independently of the historical research directory. It requires only the source code in this directory, the dataset, Python dependencies, and initialization weights. It does not depend on historical Python scripts, logs, papers, or previous experiment weights in the parent directory.
 
-支持的流程只有：
+The only supported pipeline is:
 
 ```text
-yolov8s.pt预训练初始化 → 全量train/val训练 → 本次best.pt
-→ test按时间顺序推理 → Clean → Interpolate → 三阶段统一评价
+Pretrained initialization with yolov8s.pt
+→ Training on the full training set with validation → best.pt from the current run
+→ Chronological inference on the test set
+→ Clean → Interpolate → Consistent evaluation of all three stages
 ```
 
-本次smoke只有8张训练图、4张验证图、24张测试图，使用320输入尺寸并仅训练1 epoch，不能代表正常训练效果。使用全量train/val、1280输入尺寸和50或100 epochs，是后续新实验的设置；增加数据和训练轮数不保证必然改善，应根据验证集和独立测试集结果判断。
+The smoke test used only 8 training images, 4 validation images, and 24 test images, with an input size of 320 and just 1 training epoch. Its results do not represent full-training performance. Using the complete training and validation sets, an input size of 1280, and 50 or 100 epochs constitutes a subsequent new experiment. More data and additional training epochs do not guarantee improvement; performance must be assessed using validation and independent test results.
 
-**本手册中的全量训练命令没有在本次操作中执行。** 已有验证仅为Windows CPU上的小规模1 epoch流程；Linux步骤按现有入口和路径机制编写，尚未实际验证。
+**The full-training commands in this guide have not been executed as part of this setup.** Validation so far is limited to a small-scale, 1-epoch pipeline on a Windows CPU. The Linux instructions reflect the current entry points and path-handling mechanisms but have not been tested.
 
-## 2. 下载与摆放数据集
+## 2. Download and Arrange the Dataset
 
-数据集地址：
+Dataset:
 
 [Badminton360-Shuttlecock — Hugging Face](https://huggingface.co/datasets/aissur320/Badminton360-Shuttlecock)
 
-从上述地址下载数据集，解压后将数据目录命名为 **`project`**，与 **`research_mvp` 放在同一目录下**：
+Download the dataset from the link above, extract it, and name the dataset directory **`project`**. Place it **alongside `research_mvp` in the same parent directory**:
 
 ```text
 your_workspace/
@@ -43,56 +45,56 @@ your_workspace/
     └── ...
 ```
 
-确保`images`和`labels`直接位于`project/`下，没有多套一层同名目录。训练、验证和测试图像必须具有对应同名TXT标签；背景图像保留空标签文件。
+Ensure that `images/` and `labels/` are directly inside `project/`, without an additional nested directory of the same name. Every training, validation, and test image must have a corresponding TXT label file with the same base filename. Background images must have empty label files.
 
-外部`project/`是源数据。下面的`prepare-data`会把全部数据复制到`research_mvp/data/project/`，并仅在副本中将已确认的类别0、3统一为羽毛球类别0；不改变原始数据。需要为副本预留磁盘空间。
+The external `project/` directory contains the source data. The `prepare-data` command below copies the complete dataset into `research_mvp/data/project/` and maps the confirmed source classes 0 and 3 to the single shuttlecock class 0 **in the copy only**. The original dataset remains unchanged. Ensure that sufficient disk space is available for the copy.
 
-## 3. Windows：安装环境
+## 3. Windows: Set Up the Environment
 
-使用PowerShell，先安装可正常运行的Python 3.12。在包含`project/`和`research_mvp/`的目录打开终端，再进入MVP：
+Use PowerShell and install a working Python 3.12 environment first. Open a terminal in the directory containing both `project/` and `research_mvp/`, then enter the MVP directory:
 
 ```powershell
 cd research_mvp
 python -m venv .venv
 ```
 
-每台设备重新建立自己的`.venv`，不要复用从其他设备复制来的虚拟环境。下列命令直接指定虚拟环境中的Python，不需要激活环境。
+Create a separate `.venv` on each device. Do not reuse a virtual environment copied from another device. The commands below invoke the virtual environment's Python directly, so activation is unnecessary.
 
-### CPU方式
+### CPU Installation
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements-cpu.txt
 ```
 
-全量1280尺寸训练在CPU上可能需要较长时间。若设备有可用的NVIDIA GPU，可选择下述GPU方式。
+Full training at an input size of 1280 may take considerable time on a CPU. If a compatible NVIDIA GPU is available, use the GPU installation below instead.
 
-### NVIDIA GPU方式
+### NVIDIA GPU Installation
 
-在新虚拟环境中，根据驱动和平台选择兼容的PyTorch CUDA安装命令：
+In a fresh virtual environment, choose a compatible PyTorch CUDA installation command for your driver and platform:
 
-[PyTorch官方历史版本安装说明](https://pytorch.org/get-started/previous-versions/)
+[Official PyTorch Installation Instructions for Previous Versions](https://pytorch.org/get-started/previous-versions/)
 
-选用相互兼容的`torch==2.7.1`与`torchvision==0.22.1`，安装后执行：
+Install the compatible pair `torch==2.7.1` and `torchvision==0.22.1`, then run:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe -c "import torch; print(torch.__version__); print(torch.cuda.is_available())"
 ```
 
-确认最后输出为`True`后，才能在第5节配置`device: "0"`。CPU与GPU安装方式择一；不要在需要GPU的环境中先安装`requirements-cpu.txt`。
+The final output must be `True` before setting `device: "0"` in Section 5. Choose either the CPU or GPU installation method. Do not install `requirements-cpu.txt` first in an environment intended for GPU use.
 
-### 检查依赖并下载初始化权重
+### Check Dependencies and Download Initialization Weights
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip check
 .\.venv\Scripts\python.exe fetch_weights.py
 ```
 
-下载后应有`weights/yolov8s.pt`。如果该文件已经存在且来源可信，跳过下载；下载器不会覆盖已有文件。
+After downloading, `weights/yolov8s.pt` should exist. Skip the download if this file already exists and its source is trusted. The downloader does not overwrite existing files.
 
-## 4. Linux：安装环境
+## 4. Linux: Set Up the Environment
 
-使用Bash，准备Python 3.12及其`venv`支持。在包含`project/`和`research_mvp/`的目录打开终端；示例假定`python3`指向所需版本：
+Use Bash and prepare Python 3.12 with `venv` support. Open a terminal in the directory containing both `project/` and `research_mvp/`. The example assumes that `python3` points to the required version:
 
 ```bash
 cd research_mvp
@@ -100,98 +102,98 @@ python3 --version
 python3 -m venv .venv
 ```
 
-### CPU方式
+### CPU Installation
 
 ```bash
 ./.venv/bin/python -m pip install -r requirements-cpu.txt
 ```
 
-### NVIDIA GPU方式
+### NVIDIA GPU Installation
 
-按[PyTorch官方历史版本安装说明](https://pytorch.org/get-started/previous-versions/)在新虚拟环境中安装兼容的CUDA版`torch==2.7.1`与`torchvision==0.22.1`，再执行：
+Follow the [official PyTorch installation instructions for previous versions](https://pytorch.org/get-started/previous-versions/) to install compatible CUDA builds of `torch==2.7.1` and `torchvision==0.22.1` in a fresh virtual environment, then run:
 
 ```bash
 ./.venv/bin/python -m pip install -r requirements.txt
 ./.venv/bin/python -c "import torch; print(torch.__version__); print(torch.cuda.is_available())"
 ```
 
-GPU方式要求CUDA可用性检查为`True`。CPU与GPU安装方式择一。
+The CUDA availability check must return `True` for GPU use. Choose either the CPU or GPU installation method.
 
-### 检查依赖并下载初始化权重
+### Check Dependencies and Download Initialization Weights
 
 ```bash
 ./.venv/bin/python -m pip check
 ./.venv/bin/python fetch_weights.py
 ```
 
-已有可信的`weights/yolov8s.pt`时跳过下载。不要把其他型号的权重重命名成`yolov8s.pt`。
+Skip the download if a trusted `weights/yolov8s.pt` already exists. Do not rename weights from another model to `yolov8s.pt`.
 
-## 5. 建立全量训练配置
+## 5. Create a Full-Training Configuration
 
-复制已有完整示例为自己的本地配置。
+Copy the complete example configuration to create your own local configuration.
 
-Windows：
+Windows:
 
 ```powershell
 Copy-Item configs/experiment.example.json configs/local.full.json
 ```
 
-Linux：
+Linux:
 
 ```bash
 cp configs/experiment.example.json configs/local.full.json
 ```
 
-用文本编辑器打开`configs/local.full.json`，保存为**UTF-8无BOM**。保留其他字段，按设备设置以下字段：
+Open `configs/local.full.json` in a text editor and save it as **UTF-8 without BOM**. Preserve the other fields and configure the following settings for your device:
 
-| 字段 | 设置说明 |
+| Field | Setting |
 |---|---|
-| `run_name` | 新的唯一名称，例如`yolov8s_full_50e_cpu`或`yolov8s_full_50e_gpu` |
-| `paths.data_root` | 保持`data/project`，供导入副本使用 |
-| `paths.pretrained_weights` | 保持`weights/yolov8s.pt` |
-| `paths.output_root` | 保持`outputs`，或指定MVP目录内与数据分离的新输出目录 |
-| `train.epochs` | 设为`50`；需要100轮时设为`100`，示例文件原值为100 |
-| `train.imgsz` | 保持`1280` |
-| `train.batch` | CPU可先设为`2`；GPU按显存设置，示例原值为16 |
-| `train.device` | CPU填`"cpu"`，第一块可用NVIDIA GPU填`"0"` |
-| `predict.imgsz` | 保持`1280` |
-| `predict.device` | 与所选设备一致：`"cpu"`或`"0"` |
+| `run_name` | Use a new, unique name, such as `yolov8s_full_50e_cpu` or `yolov8s_full_50e_gpu`. |
+| `paths.data_root` | Keep `data/project` for the imported dataset copy. |
+| `paths.pretrained_weights` | Keep `weights/yolov8s.pt`. |
+| `paths.output_root` | Keep `outputs`, or specify a new output directory inside the MVP directory, separate from the data. |
+| `train.epochs` | Set to `50`, or `100` for a 100-epoch run. The example configuration defaults to 100. |
+| `train.imgsz` | Keep `1280`. |
+| `train.batch` | Start with `2` on a CPU. For GPU training, choose a value appropriate for the available VRAM. The example defaults to 16. |
+| `train.device` | Use `"cpu"` for CPU training or `"0"` for the first available NVIDIA GPU. |
+| `predict.imgsz` | Keep `1280`. |
+| `predict.device` | Match the selected device: `"cpu"` or `"0"`. |
 
-配置中`epochs`、`batch`等为数字，`device`为字符串。路径字段相对于`research_mvp/`解析；`--config`后面的相对文件路径按当前工作目录解析，因此本手册始终在MVP目录执行命令。
+Values such as `epochs` and `batch` are numbers; `device` is a string. Configuration path fields are resolved relative to `research_mvp/`. Relative configuration filenames passed to `--config` are resolved against the current working directory, so all commands in this guide are executed from the MVP directory.
 
-程序在运行时会根据当前项目位置自动解析绝对路径，不包含开发者电脑的固定路径。保存到`config.resolved.json`和训练`args.yaml`的文件路径统一相对于`research_mvp/`，使用`/`分隔；`dataset.yaml`中的train/val路径相对于该YAML文件所在目录，且不设置机器相关的`path`字段。整体移动项目时，保留`data/`、`weights/`、`outputs/`之间的相对结构即可。
+At runtime, the program resolves absolute paths based on the current project location rather than using fixed paths from the developer's computer. File paths saved in `config.resolved.json` and the training `args.yaml` are relative to `research_mvp/` and use `/` separators. The train/val paths in `dataset.yaml` are relative to the directory containing that YAML file; no machine-specific `path` field is set. When moving the entire project, preserve the relative directory structure of `data/`, `weights/`, and `outputs/`.
 
-新下载者从示例配置开始创建自己的run。`outputs/`是被Git忽略的本地运行产物；`.venv/`和`.cache/`也不发布或跨设备复制，依赖按前述步骤在目标设备重新安装。
+New users should create their own runs from the example configuration. `outputs/` contains local run artifacts and is ignored by Git. `.venv/` and `.cache/` are also excluded from publication and should not be copied between devices. Reinstall dependencies on the target device using the instructions above.
 
-`source_class_map`保留`{"0": 0, "3": 0}`。如果下载数据出现其他类别ID，先核实含义，不要自行猜测映射。
+Keep `source_class_map` set to `{"0": 0, "3": 0}`. If the downloaded dataset contains other class IDs, verify their meaning before adding mappings.
 
-**训练开始后不要修改该配置**，包括预测设备、阈值和`run_name`；后续阶段会核对它与训练时保存的配置是否一致。
+**Do not modify the configuration after training starts**, including the prediction device, thresholds, or `run_name`. Subsequent stages check that the configuration matches the one saved during training.
 
-## 6. Windows：全量运行
+## 6. Windows: Run the Full Pipeline
 
-以下命令使用第5节的同一配置。每个步骤成功后再执行下一步。
+The following commands use the same configuration created in Section 5. Run each step only after the previous step succeeds.
 
 ```powershell
-# 只读检查外部源数据，并在MVP中保存检查报告
+# Inspect the external source dataset without modifying it and save an audit report in the MVP
 .\.venv\Scripts\python.exe -X utf8 mvp.py audit --data-root ../project
 
-# 全量复制并映射标签；不触发训练
+# Copy the complete dataset and map labels; this does not start training
 .\.venv\Scripts\python.exe -X utf8 mvp.py prepare-data --source ../project --config configs/local.full.json
 
-# 全量train/val训练；50/100 epochs必须显式带此开关
+# Train on the full training set with validation; 50/100 epochs require this explicit flag
 .\.venv\Scripts\python.exe -X utf8 mvp.py train --config configs/local.full.json --allow-full-train
 
-# 读取本次训练的best.pt，按序推理完整test
+# Load best.pt from the current run and perform chronological inference on the complete test set
 .\.venv\Scripts\python.exe -X utf8 mvp.py predict --config configs/local.full.json
 
-# 分别保存Clean和Interpolate结果
+# Save Clean and Interpolate outputs separately
 .\.venv\Scripts\python.exe -X utf8 mvp.py postprocess --config configs/local.full.json
 
-# 对raw、Clean和Interpolate使用同一评价器
+# Evaluate raw, Clean, and Interpolate outputs with the same evaluator
 .\.venv\Scripts\python.exe -X utf8 mvp.py evaluate --config configs/local.full.json
 ```
 
-## 7. Linux：全量运行
+## 7. Linux: Run the Full Pipeline
 
 ```bash
 ./.venv/bin/python -X utf8 mvp.py audit --data-root ../project
@@ -202,13 +204,13 @@ cp configs/experiment.example.json configs/local.full.json
 ./.venv/bin/python -X utf8 mvp.py evaluate --config configs/local.full.json
 ```
 
-`prepare-data`只需对同一个目标数据目录执行一次。如果`data/project/`已是此前成功导入并映射的完整副本，后续新实验复用它，不重复导入。若目标目录只导入了一部分，应另设新的`paths.data_root`再导入，避免覆盖混用。
+Run `prepare-data` only once for a given destination dataset directory. If `data/project/` already contains a complete, successfully imported and mapped copy, reuse it for subsequent experiments without importing it again. If a previous import was incomplete, specify a new `paths.data_root` and import into that directory to avoid overwriting or mixing data.
 
-不要使用`run-smoke`执行全量训练；该命令强制1 epoch并限制样本数量。全量训练使用上述分阶段命令。
+Do not use `run-smoke` for full training. That command forces 1 epoch and limits the number of samples. Use the staged commands above for full training.
 
-## 8. 查看结果与重新实验
+## 8. Inspect Results and Run New Experiments
 
-以`run_name: "yolov8s_full_50e_gpu"`为例：
+For example, with `run_name: "yolov8s_full_50e_gpu"`:
 
 ```text
 outputs/yolov8s_full_50e_gpu/
@@ -228,30 +230,30 @@ outputs/yolov8s_full_50e_gpu/
 └── metrics.json
 ```
 
-- `best.pt`按训练过程中的val表现选取；推理只接受该run保存的best.pt及其SHA256，不使用旧smoke权重。
-- `metrics.json`包含三个阶段的TP/FP/FN、P/R@0.5、AP50、mAP50–95。训练内部val指标与此统一评价器的定义不同，不直接混为同一指标。
-- `manifest.json`显式保存序列ID、数字帧号及顺序。缺帧、重号、乱序或尺寸变化会报错；后处理不跨序列。
-- Clean/Interpolate只使用预测和允许的帧信息；test GT只用于最终评价。train/val标签用于监督训练和验证。
-- 这是采用实际图像宽度和新AP101协议的新实验，不能直接将结果称为论文复现。
+- `best.pt` is selected based on validation performance during training. Inference accepts only the `best.pt` recorded for the current run and verifies its SHA-256 hash; it does not use weights from previous smoke tests.
+- `metrics.json` contains TP/FP/FN, P/R@0.5, AP50, and mAP50–95 for all three stages. The definitions used by the training framework's internal validation metrics differ from those of this unified evaluator and should not be treated as identical.
+- `manifest.json` explicitly records sequence IDs, numeric frame indices, and frame order. Missing frames, duplicate frame indices, incorrect ordering, or changes in image dimensions cause an error. Post-processing does not operate across sequence boundaries.
+- Clean and Interpolate use only predictions and permitted frame information. Test ground truth is used only for final evaluation. Training and validation labels are used for supervised training and validation.
+- This is a new experiment using actual image widths and a new AP101 evaluation protocol. Its results must not be described as a direct reproduction of the paper.
 
-每次新训练使用新的`run_name`。已有输出拒绝覆盖；改变配置后也不能继续沿用旧run做预测或评价。当前入口固定`resume=False`，未提供断点续训命令；训练中断后重新实验应更换run名称。
+Use a new `run_name` for every new training run. Existing outputs cannot be overwritten. After changing the configuration, you cannot reuse an old run for prediction or evaluation. The current entry point fixes `resume=False` and provides no command for resuming interrupted training. Use a new run name when restarting an experiment after an interruption.
 
-如果显存或内存不足，结束当前失败运行，在新配置、新run名称下减小`train.batch`。保持1280可避免把正式实验不经说明地改成smoke的320尺寸；若确需修改尺寸，应作为新的实验设置记录。
+If GPU or system memory is insufficient, stop the failed run and reduce `train.batch` in a new configuration with a new run name. Keeping the input size at 1280 avoids silently changing a full experiment to the smoke test's input size of 320. If a different input size is necessary, record it as a new experimental setting.
 
-可选运行现有单元测试：
+Optionally, run the existing unit tests:
 
-Windows：
+Windows:
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-Linux：
+Linux:
 
 ```bash
 ./.venv/bin/python -m unittest discover -s tests -v
 ```
 
-`data/`、`weights/`、`outputs/`、`.venv/`、缓存和`configs/local*.json`已由MVP的`.gitignore`排除。外部同级`project/`也不要加入公开仓库；只发布MVP源代码。
+The MVP's `.gitignore` excludes `data/`, `weights/`, `outputs/`, `.venv/`, caches, and `configs/local*.json`. Do not add the external sibling `project/` directory to the public repository either. Publish only the MVP source code.
 
-本手册仅提供操作步骤，没有自动执行下载、安装、数据导入、测试或训练。
+This guide provides instructions only. It does not automatically download files, install dependencies, import data, run tests, or start training.
